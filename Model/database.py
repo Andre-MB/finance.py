@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2 import Error
 
+
 class Database:
     def __init__(self, host, database, user, password, sslmode="require"):
         self.host = host
@@ -17,7 +18,7 @@ class Database:
                 database=self.database,
                 user=self.user,
                 password=self.password,
-                sslmode=self.sslmode
+                sslmode=self.sslmode,
             )
             print("✅ Conexão com o banco PostgreSQL estabelecida.")
         except Error as e:
@@ -36,7 +37,9 @@ class Database:
             self.conn.commit()
             print("✅ Query executada com sucesso.")
         except Error as e:
+            self.conn.rollback()  # Desfaz a transação em caso de erro
             print(f"❌ Erro ao executar a query: {e}")
+            raise e  # Re-levanta a exceção para que o controller saiba que algo deu errado
         finally:
             if cursor:
                 cursor.close()
@@ -54,7 +57,7 @@ class Database:
         finally:
             if cursor:
                 cursor.close()
-    
+
     def fetch_one(self, query, params=None):
         with self.conn.cursor() as cur:
             cur.execute(query, params)

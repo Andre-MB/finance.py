@@ -41,10 +41,10 @@ class MainUserController:
     def cadastrar_usuario(self, name, email, senha, cpf):
         senha_cripto = fernet.encrypt(senha.encode()).decode()
 
-        query = '''
+        query = """
         INSERT INTO "Users" ("name", "email", "senha", "cpf")
         VALUES (%s, %s, %s, %s)
-        '''
+        """
 
         try:
             self.db.execute_query(query, (name, email, senha_cripto, cpf))
@@ -54,17 +54,15 @@ class MainUserController:
             print("❌ Erro ao cadastrar usuário:", e)
             messagebox.showerror("Erro", f"Erro ao cadastrar: {e}")
 
-
-
     # === Função de login ===
     def login(self, email, senha):
-        query = '''SELECT "idUser", "name", "email", "senha" FROM "Users" WHERE "email" = %s'''
+        query = """SELECT "idUser", "name", "email", "senha" FROM "Users" WHERE "email" = %s"""
         user_data = self.db.fetch_one(query, (email,))
 
         if not user_data:
             messagebox.showerror("Erro", "Usuário não encontrado.")
             return
-        
+
         idUser, name, email, senha_cripto = user_data
         senha_armazenada = fernet.decrypt(senha_cripto.encode()).decode()
 
@@ -72,21 +70,15 @@ class MainUserController:
         # senha_armazenada = fernet.decrypt(senha_armazenada_cripto.encode()).decode()
 
         if senha == senha_armazenada:
-            messagebox.showinfo("Sucesso",  f"Bem-vindo, {name}!")
+            messagebox.showinfo("Sucesso", f"Bem-vindo, {name}!")
 
-            usuario = {
-            "idUser": idUser,
-            "name": name,
-            "email": email
-            }
+            usuario = {"idUser": idUser, "name": name, "email": email}
 
-            self.view.destroy()       
+            self.view.destroy()
 
             main_controller = MainController(usuario)
             main_controller.iniciar_app()
 
-            # MainWindow(self, usuario).mainloop() 
+            # MainWindow(self, usuario).mainloop()
         else:
             messagebox.showerror("Erro", "Senha incorreta.")
-            
-

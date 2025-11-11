@@ -1,13 +1,14 @@
 import tkinter as tk
 from tkinter import messagebox
 
+
 class RegisterWindow(tk.Tk):
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
         self.title("Finance")
         self.geometry("600x500")
-        
+
         # Título
         tk.Label(self, text="Finance", font=("Arial", 16, "bold")).pack(pady=10)
 
@@ -44,5 +45,5 @@ class RegisterWindow(tk.Tk):
         if not nome or not email or not senha or not cpf:
             messagebox.showerror("Erro", "Preencha todos os campos.")
             return
-        
+
         self.controller.cadastrar_usuario(nome, email, senha, cpf)
