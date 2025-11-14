@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+from datetime import date
 
 
 class MainWindow(tk.Tk):
@@ -9,7 +10,7 @@ class MainWindow(tk.Tk):
         self.controller = controller
         self.usuario = usuario
         self.title("Finance")
-        self.geometry("400x250")
+        self.geometry("600x450")
 
         # Cores do Dark Mode
         bg_color = "#2E2E2E"
@@ -18,10 +19,7 @@ class MainWindow(tk.Tk):
         # Configurar a cor de fundo da janela principal
         self.config(bg=bg_color)
 
-        self.label = tk.Label(
-            self, text="Finance", bg=bg_color, fg=fg_color, font=("Arial", 16, "bold")
-        )
-        self.label.pack(pady=10)
+        
 
         tk.Label(
             self,
@@ -30,6 +28,55 @@ class MainWindow(tk.Tk):
             bg=bg_color,
             fg=fg_color,
         ).pack(pady=20)
+
+        # self.label = tk.Label(
+        #     self, text="Finance", bg=bg_color, fg=fg_color, font=("Arial", 11)
+        # )
+        # self.label.pack(pady=10)
+
+
+        data_atual = date.today()
+        mes_atual = data_atual.month
+
+
+
+        frame = tk.Frame(bg="#2E2E2E")
+        frame.pack(pady=10, padx=10)
+
+        # ---- COMBOBOX MÊS ----
+        tk.Label(frame, text="Mês:", bg=bg_color, fg="#FFFFFF").grid(row=0, column=0, padx=5)
+
+        meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+        combo_mes = ttk.Combobox(frame, values=meses, state="readonly")
+        combo_mes.set(meses[mes_atual - 1])   # agora mes_atual existe
+        combo_mes.grid(row=0, column=1, padx=5)
+
+        # ---- COMBOBOX ANO ----
+        tk.Label(frame, text="Ano:", bg=bg_color, fg="#FFFFFF").grid(row=0, column=2, padx=5)
+
+        anos = [2024, 2025, 2026]
+        combo_ano = ttk.Combobox(frame, values=anos, state="readonly")
+        combo_ano.set("2025")
+        combo_ano.grid(row=0, column=3, padx=5)
+
+        # ---- LABELS que exibem o valor selecionado ----
+        label_ano = tk.Label( text=f"Ano selecionado: 2025", bg=bg_color, fg="#FFFFFF")
+        label_ano.pack(pady=2)
+
+        label_mes = tk.Label( text=f"Mês selecionado: {meses[mes_atual - 1]}", bg=bg_color, fg="#FFFFFF")
+        label_mes.pack(pady=2)
+
+        # ---- FUNÇÕES ----
+        def getcomboboxmes(event):
+            label_mes.config(text=f"Mês selecionado: {combo_mes.get()}")
+
+        def getcomboboxano(event):
+            label_ano.config(text=f"Ano selecionado: {combo_ano.get()}")
+
+        # Bind
+        combo_mes.bind("<<ComboboxSelected>>", getcomboboxmes)
+        combo_ano.bind("<<ComboboxSelected>>", getcomboboxano)
+
 
         self.btn_buscar = tk.Button(
             self,
@@ -192,3 +239,5 @@ class MainWindow(tk.Tk):
 
         # Fecha a janelinha de adicionar
         janela_para_fechar.destroy()
+
+        
