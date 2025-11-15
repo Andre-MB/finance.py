@@ -17,8 +17,8 @@ class MainController:
             password=db_password,
         )
         self.db.connect()
-        self.view = MainWindow(self, usuario)
         self.usuario = usuario
+        self.view = MainWindow(self, usuario)
 
     def iniciar_app(self):
         self.view.mainloop()
@@ -56,6 +56,35 @@ class MainController:
         query = 'SELECT "name" FROM "TransactionPaymentMethod" ORDER BY "name"'
         resultados = self.db.fetch_all(query)
         return [item[0] for item in resultados] if resultados else []
+    
+    def buscar_receitas_despesas_investimentos(self,year,month):
+        id_usuario = self.usuario["idUser"]
+        query = """
+            SELECT 
+                tc."name",
+                COALESCE(SUM(t.amount), 0) AS total
+            FROM (
+                VALUES
+                    ('305f4a9a-d977-48db-9f54-8284eead7105'::uuid),
+                    ('38ec343a-1565-4b07-9200-0bf581fa4812'::uuid),
+                    ('e66c6a9e-028d-460a-9d01-4019c283a0f7'::uuid)
+            ) AS c(id)
+            LEFT JOIN "TransactionType" tc ON tc."idType" = c.id
+            LEFT JOIN "Transaction" t 
+                ON t."idType" = c.id
+                AND t."idUser" = %s::uuid
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
+            GROUP BY c.id, tc.name
+            ORDER BY c.id
+        """
+        resultados = self.db.fetch_all(query, (id_usuario,year,month))
+        return [{"name": item[0], "total": float(item[1])} for item in resultados]
+
+
+
+
+
 
     # Dentro da classe MainController
 

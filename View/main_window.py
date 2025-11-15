@@ -29,10 +29,6 @@ class MainWindow(tk.Tk):
             fg=fg_color,
         ).pack(pady=20)
 
-        # self.label = tk.Label(
-        #     self, text="Finance", bg=bg_color, fg=fg_color, font=("Arial", 11)
-        # )
-        # self.label.pack(pady=10)
 
 
         data_atual = date.today()
@@ -43,39 +39,57 @@ class MainWindow(tk.Tk):
         frame = tk.Frame(bg="#2E2E2E")
         frame.pack(pady=10, padx=10)
 
-        # ---- COMBOBOX MÊS ----
+        # --- COMBOBOX MÊS ---
         tk.Label(frame, text="Mês:", bg=bg_color, fg="#FFFFFF").grid(row=0, column=0, padx=5)
 
-        meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-        combo_mes = ttk.Combobox(frame, values=meses, state="readonly")
-        combo_mes.set(meses[mes_atual - 1])   # agora mes_atual existe
-        combo_mes.grid(row=0, column=1, padx=5)
+        self.meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+        self.combo_mes = ttk.Combobox(frame, values=self.meses, state="readonly")
+        self.combo_mes.set(self.meses[mes_atual - 1])
+        self.combo_mes.grid(row=0, column=1, padx=5)
 
-        # ---- COMBOBOX ANO ----
+        # --- COMBOBOX ANO ---
         tk.Label(frame, text="Ano:", bg=bg_color, fg="#FFFFFF").grid(row=0, column=2, padx=5)
 
-        anos = [2024, 2025, 2026]
-        combo_ano = ttk.Combobox(frame, values=anos, state="readonly")
-        combo_ano.set("2025")
-        combo_ano.grid(row=0, column=3, padx=5)
+        self.combo_ano = ttk.Combobox(frame, values=[2024, 2025, 2026], state="readonly")
+        self.combo_ano.set("2025")
+        self.combo_ano.grid(row=0, column=3, padx=5)
+
+        # LABELS
+        self.label_saldo = tk.Label(text="Saldo: R$ 0.00", bg=bg_color, fg="#FFFFFF")
+        self.label_saldo.pack(pady=2)
+
+        self.label_receita = tk.Label(text="Receitas: R$ 0.00", bg=bg_color, fg="#FFFFFF")
+        self.label_receita.pack(pady=2)
+
+        self.label_despesa = tk.Label(text="Despesas: R$ 0.00", bg=bg_color, fg="#FFFFFF")
+        self.label_despesa.pack(pady=2)
+
+        self.label_investido = tk.Label(text="Investido: R$ 0.00", bg=bg_color, fg="#FFFFFF")
+        self.label_investido.pack(pady=2)
+
+
+        self.combo_mes.bind("<<ComboboxSelected>>", self.atualizar_valores)
+        self.combo_ano.bind("<<ComboboxSelected>>", self.atualizar_valores)
+
+        self.atualizar_valores(None)
 
         # ---- LABELS que exibem o valor selecionado ----
-        label_ano = tk.Label( text=f"Ano selecionado: 2025", bg=bg_color, fg="#FFFFFF")
-        label_ano.pack(pady=2)
+        # label_ano = tk.Label( text=f"Ano selecionado: 2025", bg=bg_color, fg="#FFFFFF")
+        # label_ano.pack(pady=2)
 
-        label_mes = tk.Label( text=f"Mês selecionado: {meses[mes_atual - 1]}", bg=bg_color, fg="#FFFFFF")
-        label_mes.pack(pady=2)
+        # label_mes = tk.Label( text=f"Mês selecionado: {meses[mes_atual - 1]}", bg=bg_color, fg="#FFFFFF")
+        # label_mes.pack(pady=2)
 
-        # ---- FUNÇÕES ----
-        def getcomboboxmes(event):
-            label_mes.config(text=f"Mês selecionado: {combo_mes.get()}")
+        # # ---- FUNÇÕES ----
+        # def getcomboboxmes(event):
+        #     label_mes.config(text=f"Mês selecionado: {combo_mes.get()}")
 
-        def getcomboboxano(event):
-            label_ano.config(text=f"Ano selecionado: {combo_ano.get()}")
+        # def getcomboboxano(event):
+        #     label_ano.config(text=f"Ano selecionado: {combo_ano.get()}")
 
-        # Bind
-        combo_mes.bind("<<ComboboxSelected>>", getcomboboxmes)
-        combo_ano.bind("<<ComboboxSelected>>", getcomboboxano)
+        # # Bind
+        # combo_mes.bind("<<ComboboxSelected>>", getcomboboxmes)
+        # combo_ano.bind("<<ComboboxSelected>>", getcomboboxano)
 
 
         self.btn_buscar = tk.Button(
@@ -239,5 +253,35 @@ class MainWindow(tk.Tk):
 
         # Fecha a janelinha de adicionar
         janela_para_fechar.destroy()
+
+    def atualizar_valores(self, event):
+        mes = self.meses.index(self.combo_mes.get()) + 1
+        ano = int(self.combo_ano.get())
+
+        resultados = self.controller.buscar_receitas_despesas_investimentos(ano, mes)
+
+        receita = 0.0
+        despesa = 0.0
+        investimento = 0.0
+
+        if resultados:
+            for item in resultados:
+                nome = item["name"].lower()
+                total = float(item["total"])
+
+                if nome in ["depósito"]:
+                    receita += total
+                elif nome == "despesa":
+                    despesa += total
+                elif nome == "investimento":
+                    investimento += total
+
+        # Atualizar labels
+        self.label_receita.config(text=f"Receitas: R$ {receita:.2f}")
+        self.label_despesa.config(text=f"Despesas: R$ {despesa:.2f}")
+        self.label_investido.config(text=f"Investido: R$ {investimento:.2f}")
+
+        saldo = receita - despesa
+        self.label_saldo.config(text=f"Saldo: R$ {saldo:.2f}")
 
         
