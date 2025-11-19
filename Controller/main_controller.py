@@ -23,23 +23,27 @@ class MainController:
     def iniciar_app(self):
         self.view.mainloop()
 
-    def buscar_dados_do_banco(self):
+    def buscar_dados_do_banco(self, mes, ano):
         # Busca as transações do usuário logado, incluindo categoria e método de pagamento
         id_usuario = self.usuario["idUser"]
         query = """
             SELECT 
+                t."idTransaction",
                 t.name, 
                 t.amount, 
                 tc.name AS category_name, 
                 tpm.name AS payment_method_name,
-                t.date
+                to_char(t.date, 'DD/MM/YYYY')
             FROM "Transaction" t
             JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
             JOIN "TransactionPaymentMethod" tpm ON t."idPaymentMethod" = tpm."idPaymentMethod"
-            WHERE t."idUser" = %s
+            WHERE 
+                t."idUser" = %s
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
             ORDER BY t.date DESC;
         """
-        dados = self.db.fetch_all(query, (id_usuario,))
+        dados = self.db.fetch_all(query, (id_usuario,ano,mes))
         self.view.exibir_dados(dados)
 
     def buscar_tipos(self):
@@ -80,6 +84,25 @@ class MainController:
         """
         resultados = self.db.fetch_all(query, (id_usuario,year,month))
         return [{"name": item[0], "total": float(item[1])} for item in resultados]
+    
+    def buscar_quantidade_transacoes_categoria(self,year,month):
+        id_usuario = self.usuario["idUser"]
+        query = """
+            SELECT 
+                tc.name AS category_name,
+                COUNT(*) AS total_transacoes
+            FROM "Transaction" t
+            JOIN "TransactionCategory" tc 
+                ON t."idCategory" = tc."idCategory"
+            WHERE 
+                t."idUser" = %s
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
+            GROUP BY tc.name
+            ORDER BY total_transacoes DESC;
+        """
+        resultados = self.db.fetch_all(query, (id_usuario,year,month))
+        return [{"name": item[0], "total": item[1]} for item in resultados]
 
 
 
@@ -146,7 +169,13 @@ class MainController:
         try:
             self.db.execute_query(query, params)
             messagebox.showinfo("Sucesso", "Transação adicionada com sucesso!")
+            self.view.atualizar_valores(None)
         except Exception as e:
             messagebox.showerror(
                 "Erro", f"Não foi possível adicionar a transação.\nErro: {e}"
             )
+
+
+    def deletar_transacao(self, id_transacao):
+        query = 'DELETE FROM "Transaction" WHERE "idTransaction" = %s'
+        self.db.execute_query(query, (id_transacao,))

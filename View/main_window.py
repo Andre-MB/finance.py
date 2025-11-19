@@ -12,11 +12,9 @@ class MainWindow(tk.Tk):
         self.title("Finance")
         self.geometry("600x450")
 
-        # Cores do Dark Mode
         bg_color = "#2E2E2E"
         fg_color = "#FFFFFF"
 
-        # Configurar a cor de fundo da janela principal
         self.config(bg=bg_color)
 
         
@@ -71,7 +69,7 @@ class MainWindow(tk.Tk):
         self.combo_mes.bind("<<ComboboxSelected>>", self.atualizar_valores)
         self.combo_ano.bind("<<ComboboxSelected>>", self.atualizar_valores)
 
-        self.atualizar_valores(None)
+        
 
         # ---- LABELS que exibem o valor selecionado ----
         # label_ano = tk.Label( text=f"Ano selecionado: 2025", bg=bg_color, fg="#FFFFFF")
@@ -95,7 +93,10 @@ class MainWindow(tk.Tk):
         self.btn_buscar = tk.Button(
             self,
             text="Ver Transações",
-            command=self.buscar_dados,
+            command=lambda: self.buscar_dados(
+                self.meses.index(self.combo_mes.get()) + 1,
+                int(self.combo_ano.get())
+            ),
             bg="#007BFF",
             fg=fg_color,
             relief="flat",
@@ -112,8 +113,19 @@ class MainWindow(tk.Tk):
         )
         self.btn_adicionar.pack(pady=5)
 
-    def buscar_dados(self):
-        self.controller.buscar_dados_do_banco()
+
+        # Frame pra mostrar a quantidade de transacoes tem por categoria
+        self.frame_categorias = tk.Frame(self, bg="#2E2E2E")
+        self.frame_categorias.pack(pady=10)
+
+
+
+
+        # Atualiza os dados da view quanto carrega a pagina
+        self.atualizar_valores(None)
+
+    def buscar_dados(self, mes, ano):
+        self.controller.buscar_dados_do_banco(mes,ano)
 
     def exibir_dados(self, dados):
 
@@ -145,9 +157,40 @@ class MainWindow(tk.Tk):
             tree.column(col, width=130, anchor="center")
 
         for row in dados:
-            tree.insert("", tk.END, values=row)
+            id_transacao = row[0]
+            valores_visiveis = row[1:]  
+            tree.insert("", tk.END, iid=str(id_transacao), values=valores_visiveis)
 
         tree.pack(expand=True, fill="both")
+
+        def deletar_transacao():
+            selecionado = tree.selection()
+            if not selecionado:
+                messagebox.showwarning("Aviso", "Selecione uma transação para deletar.")
+                return
+
+            id_transacao = selecionado[0]  # iid = idTransaction
+
+            confirmar = messagebox.askyesno(
+                "Confirmar", "Deseja realmente excluir esta transação?"
+            )
+
+            if confirmar:
+                self.controller.deletar_transacao(id_transacao)
+                tree.delete(id_transacao)
+                messagebox.showinfo("Sucesso", "Transação excluída!")
+                self.atualizar_valores(None)
+
+         # Botão de excluir
+        btn_delete = tk.Button(
+            janela,
+            text="Deletar Transação",
+            bg="#C21818",
+            fg="white",
+            relief="flat",
+            command=deletar_transacao,
+        )
+        btn_delete.pack(pady=5)
 
     def abrir_janela_adicionar(self):
         # Cria uma nova janela (Toplevel)
@@ -258,7 +301,8 @@ class MainWindow(tk.Tk):
         mes = self.meses.index(self.combo_mes.get()) + 1
         ano = int(self.combo_ano.get())
 
-        resultados = self.controller.buscar_receitas_despesas_investimentos(ano, mes)
+        resultados = self.controller.buscar_receitas_despesas_investimentos(ano,mes)
+        resultados_categoria = self.controller.buscar_quantidade_transacoes_categoria(ano,mes)
 
         receita = 0.0
         despesa = 0.0
@@ -283,5 +327,37 @@ class MainWindow(tk.Tk):
 
         saldo = receita - despesa
         self.label_saldo.config(text=f"Saldo: R$ {saldo:.2f}")
+
+
+        # Parte que printa na tela as quantidades por categoria
+        # Limpar categorias antigas
+        for widget in self.frame_categorias.winfo_children():
+            widget.destroy()
+
+        # Caso não haja categorias
+        if not resultados_categoria:
+            tk.Label(self.frame_categorias, text="Nenhuma categoria encontrada.",
+                    bg="#2E2E2E", fg="white").pack()
+            return
+
+        # Criar título
+        tk.Label(self.frame_categorias, text="Transações por categoria:",
+                bg="#2E2E2E", fg="white", font=("Arial", 10, "bold")).pack()
+
+        # Exibir cada categoria
+        for item in resultados_categoria:
+            categoria = item["name"]
+            total = item["total"]
+
+            tk.Label(
+                self.frame_categorias,
+                text=f"{categoria}: {total}",
+                bg="#2E2E2E",
+                fg="white",
+                anchor="w"
+            ).pack(fill="x")
+
+
+
 
         
