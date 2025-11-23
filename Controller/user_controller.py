@@ -1,5 +1,6 @@
 import os
 from tkinter import messagebox
+import ttkbootstrap as ttk
 from dotenv import load_dotenv, set_key
 from cryptography.fernet import Fernet
 from Controller.main_controller import MainController
@@ -31,11 +32,16 @@ class MainUserController:
         )
         self.db.connect()
 
-        # self.view = RegisterWindow(self)
-        self.view = LoginWindow(self)
+        # Cria uma janela raiz invisível para gerenciar o ciclo de vida da aplicação
+        self.root = ttk.Window(themename="darkly")
+        self.root.withdraw()  # Esconde a janela raiz
+
+        # A janela atual (login ou cadastro) será um Toplevel
+        self.current_window = None
 
     def iniciar_app(self):
-        self.view.mainloop()
+        self.abrir_janela_login()
+        self.root.mainloop()
 
     # === Função para cadastrar usuário ===
     def cadastrar_usuario(self, name, email, senha, cpf):
@@ -50,9 +56,22 @@ class MainUserController:
             self.db.execute_query(query, (name, email, senha_cripto, cpf))
             print("✅ Usuário cadastrado com sucesso!")
             messagebox.showinfo("Sucesso", "Usuário cadastrado com sucesso!")
+            self.abrir_janela_login()  # Volta para a tela de login após o sucesso
         except Exception as e:
             print("❌ Erro ao cadastrar usuário:", e)
             messagebox.showerror("Erro", f"Erro ao cadastrar: {e}")
+
+    def abrir_janela_cadastro(self):
+        """Destrói a janela atual (login) e abre a de cadastro."""
+        if self.current_window:
+            self.current_window.destroy()
+        self.current_window = RegisterWindow(self)
+
+    def abrir_janela_login(self):
+        """Destrói a janela atual (cadastro) e abre a de login."""
+        if self.current_window:
+            self.current_window.destroy()
+        self.current_window = LoginWindow(self)
 
     # === Função de login ===
     def login(self, email, senha):
@@ -74,7 +93,8 @@ class MainUserController:
 
             usuario = {"idUser": idUser, "name": name, "email": email}
 
-            self.view.destroy()
+            if self.current_window:
+                self.current_window.destroy()
 
             main_controller = MainController(usuario)
             main_controller.iniciar_app()

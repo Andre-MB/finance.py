@@ -17,29 +17,33 @@ class MainController:
             password=db_password,
         )
         self.db.connect()
-        self.view = MainWindow(self, usuario)
         self.usuario = usuario
-
+        self.view = MainWindow(self, usuario)
+        
     def iniciar_app(self):
         self.view.mainloop()
 
-    def buscar_dados_do_banco(self):
+    def buscar_dados_do_banco(self, mes, ano):
         # Busca as transações do usuário logado, incluindo categoria e método de pagamento
         id_usuario = self.usuario["idUser"]
         query = """
             SELECT 
+                t."idTransaction",
                 t.name, 
                 t.amount, 
                 tc.name AS category_name, 
                 tpm.name AS payment_method_name,
-                t.date
+                to_char(t.date, 'DD/MM/YYYY')
             FROM "Transaction" t
             JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
             JOIN "TransactionPaymentMethod" tpm ON t."idPaymentMethod" = tpm."idPaymentMethod"
-            WHERE t."idUser" = %s
+            WHERE 
+                t."idUser" = %s
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
             ORDER BY t.date DESC;
         """
-        dados = self.db.fetch_all(query, (id_usuario,))
+        dados = self.db.fetch_all(query, (id_usuario, ano, mes))
         self.view.exibir_dados(dados)
 
     def buscar_tipos(self):
@@ -56,6 +60,58 @@ class MainController:
         query = 'SELECT "name" FROM "TransactionPaymentMethod" ORDER BY "name"'
         resultados = self.db.fetch_all(query)
         return [item[0] for item in resultados] if resultados else []
+
+    def buscar_receitas_despesas_investimentos(self, year, month):
+        id_usuario = self.usuario["idUser"]
+        query = """
+            SELECT 
+                tc."name",
+                COALESCE(SUM(t.amount), 0) AS total
+            FROM (
+                VALUES
+                    ('305f4a9a-d977-48db-9f54-8284eead7105'::uuid),
+                    ('38ec343a-1565-4b07-9200-0bf581fa4812'::uuid),
+                    ('e66c6a9e-028d-460a-9d01-4019c283a0f7'::uuid)
+            ) AS c(id)
+            LEFT JOIN "TransactionType" tc ON tc."idType" = c.id
+            LEFT JOIN "Transaction" t 
+                ON t."idType" = c.id
+                AND t."idUser" = %s::uuid
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
+            GROUP BY c.id, tc.name
+            ORDER BY c.id
+        """
+        resultados = self.db.fetch_all(query, (id_usuario, year, month))
+        return (
+            [{"name": item[0], "total": float(item[1])} for item in resultados]
+            if resultados
+            else []
+        )
+
+    def buscar_quantidade_transacoes_categoria(self, year, month):
+        id_usuario = self.usuario["idUser"]
+        query = """
+            SELECT 
+                tc.name AS category_name,
+                COUNT(*) AS total_transacoes
+            FROM "Transaction" t
+            JOIN "TransactionCategory" tc 
+                ON t."idCategory" = tc."idCategory"
+            WHERE 
+                t."idUser" = %s
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
+            GROUP BY tc.name
+            ORDER BY total_transacoes DESC;
+        """
+        resultados = self.db.fetch_all(query, (id_usuario, year, month))
+        # Adiciona uma verificação para evitar erro se não houver resultados
+        return (
+            [{"name": item[0], "total": item[1]} for item in resultados]
+            if resultados
+            else []
+        )
 
     # Dentro da classe MainController
 
@@ -117,7 +173,118 @@ class MainController:
         try:
             self.db.execute_query(query, params)
             messagebox.showinfo("Sucesso", "Transação adicionada com sucesso!")
+            self.view.atualizar_valores(None)
         except Exception as e:
             messagebox.showerror(
                 "Erro", f"Não foi possível adicionar a transação.\nErro: {e}"
             )
+
+    def deletar_transacao(self, id_transacao):
+        query = 'DELETE FROM "Transaction" WHERE "idTransaction" = %s'
+        self.db.execute_query(query, (id_transacao,))
+        self.view.atualizar_valores(
+            None
+        )  # Adiciona a chamada para atualizar a view principal
+
+    def buscar_transacao_por_id(self, id_transacao):
+        query = """
+            SELECT 
+                t.name, 
+                t.amount, 
+                tt.name AS type_name,
+                tc.name AS category_name, 
+                tpm.name AS payment_method_name
+            FROM "Transaction" t
+            JOIN "TransactionType" tt ON t."idType" = tt."idType"
+            JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
+            JOIN "TransactionPaymentMethod" tpm ON t."idPaymentMethod" = tpm."idPaymentMethod"
+            WHERE t."idTransaction" = %s;
+        """
+        return self.db.fetch_one(query, (id_transacao,))
+
+    def atualizar_transacao(
+        self, id_transacao, nome, valor, tipo_nome, categoria_nome, pagamento_nome
+    ):
+        try:
+            # --- BUSCAR OS IDs PELOS NOMES (igual ao adicionar_transacao) ---
+            query_tipo = 'SELECT "idType" FROM "TransactionType" WHERE "name" = %s'
+            id_tipo = self.db.fetch_one(query_tipo, (tipo_nome,))[0]
+
+            query_categoria = (
+                'SELECT "idCategory" FROM "TransactionCategory" WHERE "name" = %s'
+            )
+            id_categoria = self.db.fetch_one(query_categoria, (categoria_nome,))[0]
+
+            query_pagamento = 'SELECT "idPaymentMethod" FROM "TransactionPaymentMethod" WHERE "name" = %s'
+            id_pagamento = self.db.fetch_one(query_pagamento, (pagamento_nome,))[0]
+
+        except (TypeError, IndexError) as e:
+            messagebox.showerror(
+                "Erro de Dados",
+                f"Não foi possível encontrar os IDs para os nomes fornecidos. Erro: {e}",
+            )
+            return False
+
+        query = """
+        UPDATE "Transaction" SET
+            "name" = %s, 
+            "amount" = %s, 
+            "idType" = %s, 
+            "idCategory" = %s, 
+            "idPaymentMethod" = %s
+        WHERE "idTransaction" = %s
+        """
+        params = (nome, valor, id_tipo, id_categoria, id_pagamento, id_transacao)
+
+        try:
+            self.db.execute_query(query, params)
+            messagebox.showinfo("Sucesso", "Transação atualizada com sucesso!")
+            self.view.atualizar_valores(None)
+            return True
+        except Exception as e:
+            messagebox.showerror(
+                "Erro", f"Não foi possível atualizar a transação.\nErro: {e}"
+            )
+            return False
+
+    def buscar_gastos_por_categoria(self, year, month):
+        id_usuario = self.usuario["idUser"]
+        query = """
+            SELECT 
+                tc.name AS category_name,
+                SUM(t.amount) AS total_gasto
+            FROM "Transaction" t
+            JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
+            JOIN "TransactionType" tt ON t."idType" = tt."idType"
+            WHERE 
+                t."idUser" = %s
+                AND tt.name = 'Despesa'
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
+            GROUP BY tc.name
+            HAVING SUM(t.amount) > 0
+            ORDER BY total_gasto DESC;
+        """
+        resultados = self.db.fetch_all(query, (id_usuario, year, month))
+        return resultados if resultados else []
+
+    def buscar_investimentos_por_categoria(self, year, month):
+        id_usuario = self.usuario["idUser"]
+        query = """
+            SELECT 
+                tc.name AS category_name,
+                SUM(t.amount) AS total_investido
+            FROM "Transaction" t
+            JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
+            JOIN "TransactionType" tt ON t."idType" = tt."idType"
+            WHERE 
+                t."idUser" = %s
+                AND tt.name = 'Investimento'
+                AND EXTRACT(YEAR FROM t."date") = %s
+                AND EXTRACT(MONTH FROM t."date") = %s
+            GROUP BY tc.name
+            HAVING SUM(t.amount) > 0
+            ORDER BY total_investido DESC;
+        """
+        resultados = self.db.fetch_all(query, (id_usuario, year, month))
+        return resultados if resultados else []
