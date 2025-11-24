@@ -8,7 +8,8 @@ load_dotenv()
 
 
 class MainController:
-    def __init__(self, usuario):
+    def __init__(self, user_controller, root, usuario):
+        self.user_controller = user_controller
         db_password = os.getenv("DB_PASSWORD")
         self.db = Database(
             host="ep-soft-feather-a4ymlnb0-pooler.us-east-1.aws.neon.tech",
@@ -17,14 +18,19 @@ class MainController:
             password=db_password,
         )
         self.db.connect()
+        self.root = root
         self.usuario = usuario
-        self.view = MainWindow(self, usuario)
-        
+        self.view = MainWindow(self.root, self, usuario)
+
     def iniciar_app(self):
-        self.view.mainloop()
+        pass
+
+    def logout(self):
+        if self.view:
+            self.view.destroy()
+        self.user_controller.reiniciar_para_login()
 
     def buscar_dados_do_banco(self, mes, ano):
-        # Busca as transações do usuário logado, incluindo categoria e método de pagamento
         id_usuario = self.usuario["idUser"]
         query = """
             SELECT 
@@ -61,34 +67,6 @@ class MainController:
         resultados = self.db.fetch_all(query)
         return [item[0] for item in resultados] if resultados else []
 
-    def buscar_receitas_despesas_investimentos(self, year, month):
-        id_usuario = self.usuario["idUser"]
-        query = """
-            SELECT 
-                tc."name",
-                COALESCE(SUM(t.amount), 0) AS total
-            FROM (
-                VALUES
-                    ('305f4a9a-d977-48db-9f54-8284eead7105'::uuid),
-                    ('38ec343a-1565-4b07-9200-0bf581fa4812'::uuid),
-                    ('e66c6a9e-028d-460a-9d01-4019c283a0f7'::uuid)
-            ) AS c(id)
-            LEFT JOIN "TransactionType" tc ON tc."idType" = c.id
-            LEFT JOIN "Transaction" t 
-                ON t."idType" = c.id
-                AND t."idUser" = %s::uuid
-                AND EXTRACT(YEAR FROM t."date") = %s
-                AND EXTRACT(MONTH FROM t."date") = %s
-            GROUP BY c.id, tc.name
-            ORDER BY c.id
-        """
-        resultados = self.db.fetch_all(query, (id_usuario, year, month))
-        return (
-            [{"name": item[0], "total": float(item[1])} for item in resultados]
-            if resultados
-            else []
-        )
-
     def buscar_quantidade_transacoes_categoria(self, year, month):
         id_usuario = self.usuario["idUser"]
         query = """
@@ -106,16 +84,11 @@ class MainController:
             ORDER BY total_transacoes DESC;
         """
         resultados = self.db.fetch_all(query, (id_usuario, year, month))
-        # Adiciona uma verificação para evitar erro se não houver resultados
         return (
             [{"name": item[0], "total": item[1]} for item in resultados]
             if resultados
             else []
         )
-
-    # Dentro da classe MainController
-
-    # ... (depois do método buscar_dados_do_banco)
 
     def adicionar_transacao(
         self, nome, valor, tipo_nome, categoria_nome, pagamento_nome
@@ -126,14 +99,12 @@ class MainController:
         data_hoje = date.today()  # Pega a data de hoje
 
         try:
-            # --- BUSCAR O ID DO TIPO ---
             query_tipo = 'SELECT "idType" FROM "TransactionType" WHERE "name" = %s'
             resultado_tipo = self.db.fetch_one(query_tipo, (tipo_nome,))
             if not resultado_tipo:
                 raise ValueError(f"Tipo '{tipo_nome}' não encontrado.")
             id_tipo = resultado_tipo[0]
 
-            # --- BUSCAR O ID DA CATEGORIA ---
             query_categoria = (
                 'SELECT "idCategory" FROM "TransactionCategory" WHERE "name" = %s'
             )
@@ -142,7 +113,6 @@ class MainController:
                 raise ValueError(f"Categoria '{categoria_nome}' não encontrada.")
             id_categoria = resultado_categoria[0]
 
-            # --- BUSCAR O ID DO MÉTODO DE PAGAMENTO ---
             query_pagamento = 'SELECT "idPaymentMethod" FROM "TransactionPaymentMethod" WHERE "name" = %s'
             resultado_pagamento = self.db.fetch_one(query_pagamento, (pagamento_nome,))
             if not resultado_pagamento:
@@ -182,9 +152,7 @@ class MainController:
     def deletar_transacao(self, id_transacao):
         query = 'DELETE FROM "Transaction" WHERE "idTransaction" = %s'
         self.db.execute_query(query, (id_transacao,))
-        self.view.atualizar_valores(
-            None
-        )  # Adiciona a chamada para atualizar a view principal
+        self.view.atualizar_valores(None)
 
     def buscar_transacao_por_id(self, id_transacao):
         query = """
@@ -206,7 +174,6 @@ class MainController:
         self, id_transacao, nome, valor, tipo_nome, categoria_nome, pagamento_nome
     ):
         try:
-            # --- BUSCAR OS IDs PELOS NOMES (igual ao adicionar_transacao) ---
             query_tipo = 'SELECT "idType" FROM "TransactionType" WHERE "name" = %s'
             id_tipo = self.db.fetch_one(query_tipo, (tipo_nome,))[0]
 
@@ -247,44 +214,47 @@ class MainController:
             )
             return False
 
-    def buscar_gastos_por_categoria(self, year, month):
+    def buscar_resumo_financeiro_completo(self, year, month):
         id_usuario = self.usuario["idUser"]
         query = """
-            SELECT 
-                tc.name AS category_name,
-                SUM(t.amount) AS total_gasto
+        WITH transacoes_mes AS (
+            SELECT t.amount, tt.name AS tipo, tc.name AS categoria
             FROM "Transaction" t
-            JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
             JOIN "TransactionType" tt ON t."idType" = tt."idType"
-            WHERE 
-                t."idUser" = %s
-                AND tt.name = 'Despesa'
-                AND EXTRACT(YEAR FROM t."date") = %s
-                AND EXTRACT(MONTH FROM t."date") = %s
-            GROUP BY tc.name
-            HAVING SUM(t.amount) > 0
-            ORDER BY total_gasto DESC;
+            JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
+            WHERE t."idUser" = %s
+              AND EXTRACT(YEAR FROM t.date) = %s
+              AND EXTRACT(MONTH FROM t.date) = %s
+        )
+        SELECT 
+            tipo, 
+            categoria, 
+            SUM(amount) as total
+        FROM transacoes_mes
+        GROUP BY tipo, categoria;
         """
-        resultados = self.db.fetch_all(query, (id_usuario, year, month))
-        return resultados if resultados else []
+        resultados_db = self.db.fetch_all(query, (id_usuario, year, month))
 
-    def buscar_investimentos_por_categoria(self, year, month):
-        id_usuario = self.usuario["idUser"]
-        query = """
-            SELECT 
-                tc.name AS category_name,
-                SUM(t.amount) AS total_investido
-            FROM "Transaction" t
-            JOIN "TransactionCategory" tc ON t."idCategory" = tc."idCategory"
-            JOIN "TransactionType" tt ON t."idType" = tt."idType"
-            WHERE 
-                t."idUser" = %s
-                AND tt.name = 'Investimento'
-                AND EXTRACT(YEAR FROM t."date") = %s
-                AND EXTRACT(MONTH FROM t."date") = %s
-            GROUP BY tc.name
-            HAVING SUM(t.amount) > 0
-            ORDER BY total_investido DESC;
-        """
-        resultados = self.db.fetch_all(query, (id_usuario, year, month))
-        return resultados if resultados else []
+        resumo = {
+            "receita": 0.0,
+            "despesa": 0.0,
+            "investimento": 0.0,
+            "gastos_por_categoria": [],
+            "investimentos_por_categoria": [],
+        }
+
+        if not resultados_db:
+            return resumo
+
+        for tipo, categoria, total in resultados_db:
+            total_float = float(total)
+            if tipo == "Depósito":
+                resumo["receita"] += total_float
+            elif tipo == "Despesa":
+                resumo["despesa"] += total_float
+                resumo["gastos_por_categoria"].append((categoria, total_float))
+            elif tipo == "Investimento":
+                resumo["investimento"] += total_float
+                resumo["investimentos_por_categoria"].append((categoria, total_float))
+
+        return resumo

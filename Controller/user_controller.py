@@ -3,13 +3,14 @@ from tkinter import messagebox
 import ttkbootstrap as ttk
 from dotenv import load_dotenv, set_key
 from cryptography.fernet import Fernet
+from Utils.cpf_validation import validar_cpf
 from Controller.main_controller import MainController
 from Model.database import Database
 from View.Register_window import RegisterWindow
 from View.Login_window import LoginWindow
 from View.main_window import MainWindow
 
-# === Carregar chave de criptografia ===
+# Carrega a chave de criptografia do .env
 load_dotenv()
 chave = os.getenv("FERNET_KEY")
 
@@ -32,19 +33,20 @@ class MainUserController:
         )
         self.db.connect()
 
-        # Cria uma janela raiz invisível para gerenciar o ciclo de vida da aplicação
         self.root = ttk.Window(themename="darkly")
-        self.root.withdraw()  # Esconde a janela raiz
-
-        # A janela atual (login ou cadastro) será um Toplevel
+        self.root.withdraw()
         self.current_window = None
 
     def iniciar_app(self):
         self.abrir_janela_login()
         self.root.mainloop()
 
-    # === Função para cadastrar usuário ===
+    # Cadastra um novo usuário no banco
     def cadastrar_usuario(self, name, email, senha, cpf):
+        if not validar_cpf(cpf):
+            messagebox.showerror("Erro de Validação", "O CPF informado é inválido.")
+            return
+
         senha_cripto = fernet.encrypt(senha.encode()).decode()
 
         query = """
@@ -56,24 +58,22 @@ class MainUserController:
             self.db.execute_query(query, (name, email, senha_cripto, cpf))
             print("✅ Usuário cadastrado com sucesso!")
             messagebox.showinfo("Sucesso", "Usuário cadastrado com sucesso!")
-            self.abrir_janela_login()  # Volta para a tela de login após o sucesso
+            self.abrir_janela_login()
         except Exception as e:
             print("❌ Erro ao cadastrar usuário:", e)
             messagebox.showerror("Erro", f"Erro ao cadastrar: {e}")
 
     def abrir_janela_cadastro(self):
-        """Destrói a janela atual (login) e abre a de cadastro."""
         if self.current_window:
             self.current_window.destroy()
-        self.current_window = RegisterWindow(self)
+        self.current_window = RegisterWindow(self, self.root)
 
     def abrir_janela_login(self):
-        """Destrói a janela atual (cadastro) e abre a de login."""
         if self.current_window:
             self.current_window.destroy()
-        self.current_window = LoginWindow(self)
+        self.current_window = LoginWindow(self, self.root)
 
-    # === Função de login ===
+    # Valida o login do usuário
     def login(self, email, senha):
         query = """SELECT "idUser", "name", "email", "senha" FROM "Users" WHERE "email" = %s"""
         user_data = self.db.fetch_one(query, (email,))
@@ -85,9 +85,6 @@ class MainUserController:
         idUser, name, email, senha_cripto = user_data
         senha_armazenada = fernet.decrypt(senha_cripto.encode()).decode()
 
-        # senha_armazenada_cripto = user_data[0]
-        # senha_armazenada = fernet.decrypt(senha_armazenada_cripto.encode()).decode()
-
         if senha == senha_armazenada:
             messagebox.showinfo("Sucesso", f"Bem-vindo, {name}!")
 
@@ -96,9 +93,11 @@ class MainUserController:
             if self.current_window:
                 self.current_window.destroy()
 
-            main_controller = MainController(usuario)
+            main_controller = MainController(self, self.root, usuario)
             main_controller.iniciar_app()
 
-            # MainWindow(self, usuario).mainloop()
         else:
             messagebox.showerror("Erro", "Senha incorreta.")
+
+    def reiniciar_para_login(self):
+        self.abrir_janela_login()

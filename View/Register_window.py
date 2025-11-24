@@ -4,22 +4,22 @@ import ttkbootstrap as ttk
 
 
 class RegisterWindow(ttk.Toplevel):
-    def __init__(self, controller):
-        super().__init__()
+    def __init__(self, controller, parent):
+        super().__init__(parent)
         self.controller = controller
+        self.parent = parent
         self.title("Finance")
         self.geometry("600x500")
 
-        # Título
+        self.protocol("WM_DELETE_WINDOW", self.fechar_app)
+
         ttk.Label(self, text="Cadastro de Usuário", font=("Arial", 16, "bold")).pack(
             pady=10
         )
 
-        # Frame central para organizar os campos
         frame = ttk.Frame(self)
         frame.pack(pady=20)
 
-        # Campos de entrada
         ttk.Label(frame, text="Nome:").grid(row=0, column=0, padx=5, pady=5)
         self.entry_nome = ttk.Entry(frame)
         self.entry_nome.grid(row=0, column=1, padx=5, pady=5)
@@ -36,12 +36,10 @@ class RegisterWindow(ttk.Toplevel):
         self.entry_cpf = ttk.Entry(frame)
         self.entry_cpf.grid(row=3, column=1, padx=5, pady=5)
 
-        # Botão de cadastro
         ttk.Button(
             self, text="Cadastrar", command=self.cadastrar, bootstyle="success"
         ).pack(pady=10)
 
-        # Botão para voltar para a tela de login
         btn_voltar_login = ttk.Button(
             self,
             text="Já tem uma conta? Faça o login",
@@ -65,3 +63,6 @@ class RegisterWindow(ttk.Toplevel):
 
     def voltar_para_login(self):
         self.controller.abrir_janela_login()
+
+    def fechar_app(self):
+        self.parent.destroy()
