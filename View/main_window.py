@@ -5,6 +5,10 @@ from datetime import date
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+from .transactions_list_window import TransactionsListWindow
+from .add_transaction_window import AddTransactionWindow
+from .edit_transaction_window import EditTransactionWindow
+
 
 class MainWindow(ttk.Toplevel):
     def __init__(self, parent, controller, usuario):
@@ -37,8 +41,8 @@ class MainWindow(ttk.Toplevel):
         main_frame = ttk.Frame(self)
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        main_frame.grid_columnconfigure(0, weight=45)
-        main_frame.grid_columnconfigure(1, weight=55)
+        main_frame.grid_columnconfigure(0, weight=4)
+        main_frame.grid_columnconfigure(1, weight=6)
         main_frame.grid_rowconfigure(0, weight=1)
 
         self.left_frame = ttk.Frame(main_frame)
@@ -149,290 +153,19 @@ class MainWindow(ttk.Toplevel):
         self.controller.buscar_dados_do_banco(mes, ano)
 
     def exibir_dados(self, dados):
-        janela = ttk.Toplevel(self)
-        janela.title("Transações e Análise de Gastos")
-        janela.geometry("800x600")
-
-        mes = self.meses.index(self.combo_mes.get()) + 1
-        ano = int(self.combo_ano.get())
-
-        resumo_completo = self.controller.buscar_resumo_financeiro_completo(ano, mes)
-        receita = resumo_completo["receita"]
-        despesa = resumo_completo["despesa"]
-        investimento = resumo_completo["investimento"]
-
-        # Calcula a sobra líquida conforme solicitado
-        saldo_restante = receita - despesa - investimento
-
-        frame_resumo = ttk.Frame(janela)
-        frame_resumo.pack(pady=10, padx=10, fill="x")
-
-        ttk.Label(
-            frame_resumo,
-            text=f"Total Receitas: R$ {receita:.2f}",
-            bootstyle="success",
-            font=("Arial", 12, "bold"),
-        ).pack(anchor="w")
-        ttk.Label(
-            frame_resumo,
-            text=f"Total Despesas: R$ {despesa:.2f}",
-            bootstyle="danger",
-            font=("Arial", 12, "bold"),
-        ).pack(anchor="w")
-        ttk.Label(
-            frame_resumo,
-            text=f"Total Investido: R$ {investimento:.2f}",
-            bootstyle="info",
-            font=("Arial", 12, "bold"),
-        ).pack(anchor="w")
-
-        cor_sobra = "success" if saldo_restante >= 0 else "danger"
-        ttk.Label(
-            frame_resumo,
-            text=f"Saldo Restante: R$ {saldo_restante:.2f}",
-            bootstyle=cor_sobra,
-            font=("Arial", 14, "bold"),
-        ).pack(anchor="w")
-
-        frame_tabela = ttk.Frame(janela)
-        frame_tabela.pack(side="bottom", fill="both", expand=True, padx=10, pady=10)
-
-        colunas_visiveis = ("Nome", "Valor", "Categoria", "Pagamento", "Data")
-
-        style = ttk.Style()
-        style.configure("Treeview", rowheight=25)
-
-        tree = ttk.Treeview(frame_tabela, columns=colunas_visiveis, show="headings")
-
-        for col in colunas_visiveis:
-            tree.heading(col, text=col)
-            tree.column(col, width=100, anchor="center")
-
-        for row in dados:
-            tree.insert("", tk.END, iid=row[0], values=row[1:])
-
-        tree.pack(expand=True, fill="both")
-
-        def deletar_transacao():
-            selecionado = tree.selection()
-            if not selecionado:
-                messagebox.showwarning("Aviso", "Selecione uma transação para deletar.")
-                return
-
-            id_transacao = selecionado[0]
-
-            confirmar = messagebox.askyesno(
-                "Confirmar", "Deseja realmente excluir esta transação?"
-            )
-
-            if confirmar:
-                self.controller.deletar_transacao(id_transacao)
-                tree.delete(selecionado[0])
-                messagebox.showinfo("Sucesso", "Transação excluída!")
-                self.atualizar_valores(None)
-
-        btn_edit = ttk.Button(
-            frame_tabela,
-            text="Editar Transação",
-            bootstyle="warning",
-            command=lambda: self.abrir_janela_editar(tree),
+        TransactionsListWindow(
+            self, self.controller, dados, lambda: self.atualizar_valores(None)
         )
-        btn_edit.pack(side="left", padx=10, pady=10)
-
-        btn_delete = ttk.Button(
-            frame_tabela,
-            text="Deletar Transação",
-            bootstyle="danger-outline",
-            command=deletar_transacao,
-        )
-        btn_delete.pack(side="left", padx=10, pady=10)
-
-    def _deletar_transacao_selecionada(self, tree):
-        selecionado = tree.selection()
-        if not selecionado:
-            messagebox.showwarning("Aviso", "Selecione uma transação para deletar.")
-            return
 
     def abrir_janela_adicionar(self):
-        janela_add = ttk.Toplevel(self)
-        janela_add.title("Nova Transação")
-        janela_add.geometry("400x350")
-
-        frame = ttk.Frame(janela_add)
-        frame.pack(pady=20, padx=20)
-
-        ttk.Label(frame, text="Nome:").grid(row=0, column=0, sticky="w")
-        entry_nome = ttk.Entry(frame)
-        entry_nome.grid(row=0, column=1, pady=5)
-
-        ttk.Label(frame, text="Valor (R$):").grid(row=1, column=0, sticky="w")
-        entry_valor = ttk.Entry(frame)
-        entry_valor.grid(row=1, column=1, pady=5)
-
-        ttk.Label(frame, text="Tipo:").grid(row=2, column=0, sticky="w")
-        tipos_transacao = [
-            "Receita",
-            "Despesa",
-            "Investimento",
-        ]
-        tipos_transacao = self.controller.buscar_tipos()
-        combo_tipo = ttk.Combobox(frame, values=tipos_transacao, state="readonly")
-        combo_tipo.grid(row=2, column=1, pady=5)
-
-        ttk.Label(frame, text="Categoria:").grid(row=3, column=0, sticky="w")
-        categorias = self.controller.buscar_categorias()
-        combo_categoria = ttk.Combobox(frame, values=categorias, state="readonly")
-        combo_categoria.grid(row=3, column=1, pady=5)
-
-        ttk.Label(frame, text="Pagamento:").grid(row=4, column=0, sticky="w")
-        metodos_pagamento = self.controller.buscar_metodos_pagamento()
-        combo_pagamento = ttk.Combobox(
-            frame, values=metodos_pagamento, state="readonly"
-        )
-        combo_pagamento.grid(row=4, column=1, pady=5)
-
-        def on_tipo_selected(event):
-            tipo_selecionado = combo_tipo.get()
-            if tipo_selecionado == "Investimento":
-                combo_categoria.set("Outros")
-
-                combo_categoria.config(state="disabled")
-            else:
-                combo_categoria.config(state="readonly")
-                if tipo_selecionado == "Despesa":
-                    combo_categoria.set("")
-
-        combo_tipo.bind("<<ComboboxSelected>>", on_tipo_selected)
-
-        btn_salvar = ttk.Button(
-            janela_add,
-            text="Salvar",
-            command=lambda: self.salvar_transacao(
-                janela_add,
-                entry_nome.get(),
-                entry_valor.get(),
-                combo_tipo.get(),
-                combo_categoria.get(),
-                combo_pagamento.get(),
-            ),
-            bootstyle="success",
-        )
-        btn_salvar.pack(pady=10)
-
-    def salvar_transacao(
-        self, janela_para_fechar, nome, valor, tipo, categoria, metodo_pagamento
-    ):
-        if not nome or not valor or not tipo or not categoria or not metodo_pagamento:
-            messagebox.showerror(
-                "Erro", "Preencha todos os campos.", parent=janela_para_fechar
-            )
-            return
-
-        try:
-            valor_float = float(valor)
-        except ValueError:
-            messagebox.showerror(
-                "Erro", "O valor deve ser um número.", parent=janela_para_fechar
-            )
-            return
-
-        self.controller.adicionar_transacao(
-            nome, valor_float, tipo, categoria, metodo_pagamento
+        AddTransactionWindow(
+            self, self.controller, lambda: self.atualizar_valores(None)
         )
 
-        janela_para_fechar.destroy()
-
-    def abrir_janela_editar(self, tree):
-        selecionado = tree.selection()
-        if not selecionado:
-            messagebox.showwarning("Aviso", "Selecione uma transação para editar.")
-            return
-
-        id_transacao = selecionado[0]
-
-        dados_transacao = self.controller.buscar_transacao_por_id(id_transacao)
-        if not dados_transacao:
-            messagebox.showerror(
-                "Erro", "Não foi possível carregar os dados da transação."
-            )
-            return
-
-        (
-            nome_atual,
-            valor_atual,
-            tipo_atual,
-            categoria_atual,
-            pagamento_atual,
-        ) = dados_transacao
-
-        janela_edit = ttk.Toplevel(self)
-        janela_edit.title("Editar Transação")
-        janela_edit.geometry("400x300")
-
-        frame = ttk.Frame(janela_edit)
-        frame.pack(pady=20, padx=20)
-
-        ttk.Label(frame, text="Nome:").grid(row=0, column=0, sticky="w")
-        entry_nome = ttk.Entry(frame)
-        entry_nome.insert(0, nome_atual)
-        entry_nome.grid(row=0, column=1, pady=5)
-
-        ttk.Label(frame, text="Valor (R$):").grid(row=1, column=0, sticky="w")
-        entry_valor = ttk.Entry(frame)
-        entry_valor.insert(0, f"{valor_atual:.2f}")
-        entry_valor.grid(row=1, column=1, pady=5)
-
-        ttk.Label(frame, text="Tipo:").grid(row=2, column=0, sticky="w")
-        tipos_transacao = self.controller.buscar_tipos()
-        combo_tipo = ttk.Combobox(frame, values=tipos_transacao, state="readonly")
-        combo_tipo.set(tipo_atual)
-        combo_tipo.grid(row=2, column=1, pady=5)
-
-        ttk.Label(frame, text="Categoria:").grid(row=3, column=0, sticky="w")
-        categorias = self.controller.buscar_categorias()
-        combo_categoria = ttk.Combobox(frame, values=categorias, state="readonly")
-        combo_categoria.set(categoria_atual)
-        combo_categoria.grid(row=3, column=1, pady=5)
-
-        ttk.Label(frame, text="Pagamento:").grid(row=4, column=0, sticky="w")
-        metodos_pagamento = self.controller.buscar_metodos_pagamento()
-        combo_pagamento = ttk.Combobox(
-            frame, values=metodos_pagamento, state="readonly"
+    def abrir_janela_editar(self, id_transacao):
+        EditTransactionWindow(
+            self, self.controller, id_transacao, lambda: self.atualizar_valores(None)
         )
-        combo_pagamento.set(pagamento_atual)
-        combo_pagamento.grid(row=4, column=1, pady=5)
-
-        btn_salvar = ttk.Button(
-            janela_edit,
-            text="Salvar Alterações",
-            command=lambda: self.salvar_edicao(
-                janela_edit,
-                id_transacao,
-                entry_nome.get(),
-                entry_valor.get(),
-                combo_tipo.get(),
-                combo_categoria.get(),
-                combo_pagamento.get(),
-            ),
-            bootstyle="success",
-        )
-        btn_salvar.pack(pady=10)
-
-    def salvar_edicao(
-        self,
-        janela_para_fechar,
-        id_transacao,
-        nome,
-        valor,
-        tipo,
-        categoria,
-        metodo_pagamento,
-    ):
-        valor_float = float(valor)
-        self.controller.atualizar_transacao(
-            id_transacao, nome, valor_float, tipo, categoria, metodo_pagamento
-        )
-        janela_para_fechar.destroy()
 
     def atualizar_valores(self, event):
         mes = self.meses.index(self.combo_mes.get()) + 1
@@ -473,7 +206,7 @@ class MainWindow(ttk.Toplevel):
             if investimento > 0:
                 labels_grafico.append("Investimentos")
                 valores_grafico.append(investimento)
-                cores_grafico.append("#2196F3")  # Azul
+                cores_grafico.append("#2196F3") 
 
             if sobra > 0:
                 labels_grafico.append("Sobra")
@@ -512,9 +245,7 @@ class MainWindow(ttk.Toplevel):
                 color="white",
                 fontsize=12,
             )
-            fig.tight_layout(
-                pad=2.0
-            )  # Ajusta o layout para garantir que a legenda não seja cortada
+            fig.tight_layout(pad=2.0)
 
             # Cria o canvas do Tkinter para exibir o gráfico
             canvas = FigureCanvasTkAgg(fig, master=self.right_frame)

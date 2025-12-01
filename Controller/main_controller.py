@@ -123,7 +123,7 @@ class MainController:
 
         except ValueError as e:
             messagebox.showerror("Erro de Dados", str(e))
-            return
+            return False
 
         query = """
         INSERT INTO "Transaction" 
@@ -143,11 +143,13 @@ class MainController:
         try:
             self.db.execute_query(query, params)
             messagebox.showinfo("Sucesso", "Transação adicionada com sucesso!")
-            self.view.atualizar_valores(None)
+            # A atualização agora é chamada pela própria janela ao fechar
+            return True
         except Exception as e:
             messagebox.showerror(
                 "Erro", f"Não foi possível adicionar a transação.\nErro: {e}"
             )
+            return False
 
     def deletar_transacao(self, id_transacao):
         query = 'DELETE FROM "Transaction" WHERE "idTransaction" = %s'
@@ -206,7 +208,6 @@ class MainController:
         try:
             self.db.execute_query(query, params)
             messagebox.showinfo("Sucesso", "Transação atualizada com sucesso!")
-            self.view.atualizar_valores(None)
             return True
         except Exception as e:
             messagebox.showerror(
