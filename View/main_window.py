@@ -1,363 +1,332 @@
 import tkinter as tk
 from tkinter import messagebox
-from tkinter import ttk
+import ttkbootstrap as ttk
 from datetime import date
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+from .transactions_list_window import TransactionsListWindow
+from .add_transaction_window import AddTransactionWindow
+from .edit_transaction_window import EditTransactionWindow
 
 
-class MainWindow(tk.Tk):
-    def __init__(self, controller, usuario):
-        super().__init__()
+class MainWindow(ttk.Toplevel):
+    def __init__(self, parent, controller, usuario):
+        super().__init__(parent)
         self.controller = controller
         self.usuario = usuario
         self.title("Finance")
-        self.geometry("600x450")
+        self.parent = parent
+        self.geometry("1200x800")
 
-        bg_color = "#2E2E2E"
-        fg_color = "#FFFFFF"
+        self.protocol("WM_DELETE_WINDOW", self.fechar_app)
 
-        self.config(bg=bg_color)
+        header_frame = ttk.Frame(self)
+        header_frame.pack(fill="x", padx=10, pady=(10, 0))
 
-        
-
-        tk.Label(
-            self,
+        ttk.Label(
+            header_frame,
             text=f"Bem-vindo, {self.usuario['name']}!",
             font=("Arial", 14),
-            bg=bg_color,
-            fg=fg_color,
-        ).pack(pady=20)
+        ).pack(side="left")
 
+        btn_logout = ttk.Button(
+            header_frame,
+            text="Sair",
+            command=self.logout,
+            bootstyle="danger-outline",
+        )
+        btn_logout.pack(side="right")
 
+        main_frame = ttk.Frame(self)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        main_frame.grid_columnconfigure(0, weight=4)
+        main_frame.grid_columnconfigure(1, weight=6)
+        main_frame.grid_rowconfigure(0, weight=1)
+
+        self.left_frame = ttk.Frame(main_frame)
+        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        self.right_frame = ttk.Frame(main_frame)
+        self.right_frame.grid(row=0, column=1, sticky="nsew")
 
         data_atual = date.today()
         mes_atual = data_atual.month
 
+        frame_data = ttk.Frame(self.left_frame)
+        frame_data.pack(pady=10)
 
+        ttk.Label(frame_data, text="Mês:").grid(row=0, column=0, padx=5)
 
-        frame = tk.Frame(bg="#2E2E2E")
-        frame.pack(pady=10, padx=10)
-
-        # --- COMBOBOX MÊS ---
-        tk.Label(frame, text="Mês:", bg=bg_color, fg="#FFFFFF").grid(row=0, column=0, padx=5)
-
-        self.meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-        self.combo_mes = ttk.Combobox(frame, values=self.meses, state="readonly")
+        self.meses = [
+            "Jan",
+            "Fev",
+            "Mar",
+            "Abr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Ago",
+            "Set",
+            "Out",
+            "Nov",
+            "Dez",
+        ]
+        self.combo_mes = ttk.Combobox(frame_data, values=self.meses, state="readonly")
         self.combo_mes.set(self.meses[mes_atual - 1])
         self.combo_mes.grid(row=0, column=1, padx=5)
 
-        # --- COMBOBOX ANO ---
-        tk.Label(frame, text="Ano:", bg=bg_color, fg="#FFFFFF").grid(row=0, column=2, padx=5)
+        ttk.Label(frame_data, text="Ano:").grid(row=0, column=2, padx=5)
 
-        self.combo_ano = ttk.Combobox(frame, values=[2024, 2025, 2026], state="readonly")
+        self.combo_ano = ttk.Combobox(
+            frame_data, values=[2024, 2025, 2026], state="readonly"
+        )
         self.combo_ano.set("2025")
         self.combo_ano.grid(row=0, column=3, padx=5)
 
-        # LABELS
-        self.label_saldo = tk.Label(text="Saldo: R$ 0.00", bg=bg_color, fg="#FFFFFF")
-        self.label_saldo.pack(pady=2)
+        self.label_saldo = ttk.Label(
+            self.left_frame,
+            text="Saldo: R$ 0.00",
+            font=("Arial", 12, "bold"),
+        )
+        self.label_saldo.pack(pady=10, anchor="w")
 
-        self.label_receita = tk.Label(text="Receitas: R$ 0.00", bg=bg_color, fg="#FFFFFF")
-        self.label_receita.pack(pady=2)
+        self.label_receita = ttk.Label(
+            self.left_frame,
+            text="Receitas: R$ 0.00",
+            bootstyle="success",
+            font=("Arial", 10),
+        )
+        self.label_receita.pack(pady=2, anchor="w")
 
-        self.label_despesa = tk.Label(text="Despesas: R$ 0.00", bg=bg_color, fg="#FFFFFF")
-        self.label_despesa.pack(pady=2)
+        self.label_despesa = ttk.Label(
+            self.left_frame,
+            text="Despesas: R$ 0.00",
+            bootstyle="danger",
+            font=("Arial", 10),
+        )
+        self.label_despesa.pack(pady=2, anchor="w")
 
-        self.label_investido = tk.Label(text="Investido: R$ 0.00", bg=bg_color, fg="#FFFFFF")
-        self.label_investido.pack(pady=2)
-
+        self.label_investido = ttk.Label(
+            self.left_frame,
+            text="Investido: R$ 0.00",
+            bootstyle="info",
+            font=("Arial", 10),
+        )
+        self.label_investido.pack(pady=2, anchor="w")
 
         self.combo_mes.bind("<<ComboboxSelected>>", self.atualizar_valores)
         self.combo_ano.bind("<<ComboboxSelected>>", self.atualizar_valores)
 
-        
+        button_frame = ttk.Frame(self.left_frame)
+        button_frame.pack(pady=10)
 
-        # ---- LABELS que exibem o valor selecionado ----
-        # label_ano = tk.Label( text=f"Ano selecionado: 2025", bg=bg_color, fg="#FFFFFF")
-        # label_ano.pack(pady=2)
-
-        # label_mes = tk.Label( text=f"Mês selecionado: {meses[mes_atual - 1]}", bg=bg_color, fg="#FFFFFF")
-        # label_mes.pack(pady=2)
-
-        # # ---- FUNÇÕES ----
-        # def getcomboboxmes(event):
-        #     label_mes.config(text=f"Mês selecionado: {combo_mes.get()}")
-
-        # def getcomboboxano(event):
-        #     label_ano.config(text=f"Ano selecionado: {combo_ano.get()}")
-
-        # # Bind
-        # combo_mes.bind("<<ComboboxSelected>>", getcomboboxmes)
-        # combo_ano.bind("<<ComboboxSelected>>", getcomboboxano)
-
-
-        self.btn_buscar = tk.Button(
-            self,
+        self.btn_buscar = ttk.Button(
+            button_frame,
             text="Ver Transações",
-            command=lambda: self.buscar_dados(
-                self.meses.index(self.combo_mes.get()) + 1,
-                int(self.combo_ano.get())
-            ),
-            bg="#007BFF",
-            fg=fg_color,
-            relief="flat",
+            command=self.buscar_dados,
         )
-        self.btn_buscar.pack(pady=5)
+        self.btn_buscar.pack(side="left", padx=5)
 
-        self.btn_adicionar = tk.Button(
-            self,
+        self.btn_adicionar = ttk.Button(
+            button_frame,
             text="Adicionar Transação",
             command=self.abrir_janela_adicionar,
-            bg="#007BFF",
-            fg=fg_color,
-            relief="flat",
         )
-        self.btn_adicionar.pack(pady=5)
+        self.btn_adicionar.pack(side="left", padx=5)
 
+        self.progress_bars_frame = ttk.Frame(self.left_frame)
+        self.progress_bars_frame.pack(pady=(20, 0), fill="x")
 
-        # Frame pra mostrar a quantidade de transacoes tem por categoria
-        self.frame_categorias = tk.Frame(self, bg="#2E2E2E")
-        self.frame_categorias.pack(pady=10)
-
-
-
-
-        # Atualiza os dados da view quanto carrega a pagina
         self.atualizar_valores(None)
 
-    def buscar_dados(self, mes, ano):
-        self.controller.buscar_dados_do_banco(mes,ano)
+    def fechar_app(self):
+        self.parent.destroy()
+
+    def logout(self):
+        self.controller.logout()
+
+    def buscar_dados(self):
+        mes = self.meses.index(self.combo_mes.get()) + 1
+        ano = int(self.combo_ano.get())
+        self.controller.buscar_dados_do_banco(mes, ano)
 
     def exibir_dados(self, dados):
-
-        janela = tk.Toplevel()
-        janela.title("Transações")
-        janela.config(bg="#2E2E2E")
-
-        # Estilo para o Treeview (tabela)
-        style = ttk.Style()
-        style.theme_use("default")
-        style.configure(
-            "Treeview",
-            background="#2E2E2E",
-            foreground="white",
-            fieldbackground="#3E3E3E",
-            borderwidth=0,
+        TransactionsListWindow(
+            self, self.controller, dados, lambda: self.atualizar_valores(None)
         )
-        style.map("Treeview", background=[("selected", "#007BFF")])
-        style.configure(
-            "Treeview.Heading", background="#3E3E3E", foreground="white", relief="flat"
-        )
-        style.map("Treeview.Heading", background=[("active", "#555555")])
-
-        colunas = ("Nome", "Valor", "Categoria", "Pagamento", "Data")
-        tree = ttk.Treeview(janela, columns=colunas, show="headings")
-
-        for col in colunas:
-            tree.heading(col, text=col)
-            tree.column(col, width=130, anchor="center")
-
-        for row in dados:
-            id_transacao = row[0]
-            valores_visiveis = row[1:]  
-            tree.insert("", tk.END, iid=str(id_transacao), values=valores_visiveis)
-
-        tree.pack(expand=True, fill="both")
-
-        def deletar_transacao():
-            selecionado = tree.selection()
-            if not selecionado:
-                messagebox.showwarning("Aviso", "Selecione uma transação para deletar.")
-                return
-
-            id_transacao = selecionado[0]  # iid = idTransaction
-
-            confirmar = messagebox.askyesno(
-                "Confirmar", "Deseja realmente excluir esta transação?"
-            )
-
-            if confirmar:
-                self.controller.deletar_transacao(id_transacao)
-                tree.delete(id_transacao)
-                messagebox.showinfo("Sucesso", "Transação excluída!")
-                self.atualizar_valores(None)
-
-         # Botão de excluir
-        btn_delete = tk.Button(
-            janela,
-            text="Deletar Transação",
-            bg="#C21818",
-            fg="white",
-            relief="flat",
-            command=deletar_transacao,
-        )
-        btn_delete.pack(pady=5)
 
     def abrir_janela_adicionar(self):
-        # Cria uma nova janela (Toplevel)
-        janela_add = tk.Toplevel(self)
-        janela_add.title("Nova Transação")
-        janela_add.geometry("400x300")
-        janela_add.config(bg="#2E2E2E")  # Cor de fundo dark
-
-        # --- Campos de Entrada (Labels e Entrys) ---
-        frame = tk.Frame(janela_add, bg="#2E2E2E")
-        frame.pack(pady=20, padx=20)
-
-        # Campo Nome
-        tk.Label(frame, text="Nome:", bg="#2E2E2E", fg="#FFFFFF").grid(
-            row=0, column=0, sticky="w"
-        )
-        entry_nome = tk.Entry(frame, bg="#3E3E3E", fg="#FFFFFF")
-        entry_nome.grid(row=0, column=1, pady=5)
-
-        # Campo Valor
-        tk.Label(frame, text="Valor (R$):", bg="#2E2E2E", fg="#FFFFFF").grid(
-            row=1, column=0, sticky="w"
-        )
-        entry_valor = tk.Entry(frame, bg="#3E3E3E", fg="#FFFFFF")
-        entry_valor.grid(row=1, column=1, pady=5)
-
-        # Campo Tipo (usando um Combobox)
-        tk.Label(frame, text="Tipo:", bg="#2E2E2E", fg="#FFFFFF").grid(
-            row=2, column=0, sticky="w"
-        )
-        # O ideal é buscar esses valores do banco. Vamos usar valores fixos por enquanto.
-        tipos_transacao = [
-            "Receita",
-            "Despesa",
-        ]  # Assumindo que estes existem na sua tabela TransactionType
-        # Carrega os tipos dinamicamente do banco de dados
-        tipos_transacao = self.controller.buscar_tipos()
-        combo_tipo = ttk.Combobox(frame, values=tipos_transacao, state="readonly")
-        combo_tipo.grid(row=2, column=1, pady=5)
-
-        # Campo Categoria
-        tk.Label(frame, text="Categoria:", bg="#2E2E2E", fg="#FFFFFF").grid(
-            row=3, column=0, sticky="w"
-        )
-        # Valores de exemplo. Crie-os na sua tabela TransactionCategory.
-        categorias = ["Salário", "Alimentação", "Transporte", "Lazer"]
-        # Carrega as categorias dinamicamente do banco de dados
-        categorias = self.controller.buscar_categorias()
-        combo_categoria = ttk.Combobox(frame, values=categorias, state="readonly")
-        combo_categoria.grid(row=3, column=1, pady=5)
-
-        # Campo Método de Pagamento
-        tk.Label(frame, text="Pagamento:", bg="#2E2E2E", fg="#FFFFFF").grid(
-            row=4, column=0, sticky="w"
-        )
-        # Carrega os métodos de pagamento dinamicamente do banco de dados
-        metodos_pagamento = self.controller.buscar_metodos_pagamento()
-        combo_pagamento = ttk.Combobox(
-            frame, values=metodos_pagamento, state="readonly"
-        )
-        combo_pagamento.grid(row=4, column=1, pady=5)
-
-        # --- Botão Salvar ---
-        # A função lambda é importante para passar os argumentos para o método salvar
-        btn_salvar = tk.Button(
-            janela_add,
-            text="Salvar",
-            command=lambda: self.salvar_transacao(
-                janela_add,  # Passa a própria janela para poder fechá-la
-                entry_nome.get(),
-                entry_valor.get(),
-                combo_tipo.get(),
-                combo_categoria.get(),
-                combo_pagamento.get(),
-            ),
-        )
-        btn_salvar.pack(pady=10)
-
-    # Ainda na classe MainWindow
-
-    def salvar_transacao(
-        self, janela_para_fechar, nome, valor, tipo, categoria, metodo_pagamento
-    ):
-        # Validação simples
-        if not nome or not valor or not tipo or not categoria or not metodo_pagamento:
-            messagebox.showerror(
-                "Erro", "Preencha todos os campos.", parent=janela_para_fechar
-            )
-            return
-
-        try:
-            valor_float = float(valor)
-        except ValueError:
-            messagebox.showerror(
-                "Erro", "O valor deve ser um número.", parent=janela_para_fechar
-            )
-            return
-
-        # Chama o método do controller para fazer a mágica
-        self.controller.adicionar_transacao(
-            nome, valor_float, tipo, categoria, metodo_pagamento
+        AddTransactionWindow(
+            self, self.controller, lambda: self.atualizar_valores(None)
         )
 
-        # Fecha a janelinha de adicionar
-        janela_para_fechar.destroy()
+    def abrir_janela_editar(self, id_transacao):
+        EditTransactionWindow(
+            self, self.controller, id_transacao, lambda: self.atualizar_valores(None)
+        )
 
     def atualizar_valores(self, event):
         mes = self.meses.index(self.combo_mes.get()) + 1
         ano = int(self.combo_ano.get())
 
-        resultados = self.controller.buscar_receitas_despesas_investimentos(ano,mes)
-        resultados_categoria = self.controller.buscar_quantidade_transacoes_categoria(ano,mes)
+        resumo_completo = self.controller.buscar_resumo_financeiro_completo(ano, mes)
 
-        receita = 0.0
-        despesa = 0.0
-        investimento = 0.0
+        receita = resumo_completo["receita"]
+        despesa = resumo_completo["despesa"]
+        investimento = resumo_completo["investimento"]
+        gastos_por_categoria = resumo_completo["gastos_por_categoria"]
+        investimentos_por_categoria = resumo_completo["investimentos_por_categoria"]
 
-        if resultados:
-            for item in resultados:
-                nome = item["name"].lower()
-                total = float(item["total"])
-
-                if nome in ["depósito"]:
-                    receita += total
-                elif nome == "despesa":
-                    despesa += total
-                elif nome == "investimento":
-                    investimento += total
-
-        # Atualizar labels
         self.label_receita.config(text=f"Receitas: R$ {receita:.2f}")
         self.label_despesa.config(text=f"Despesas: R$ {despesa:.2f}")
         self.label_investido.config(text=f"Investido: R$ {investimento:.2f}")
 
-        saldo = receita - despesa
+        saldo = receita - despesa - investimento
         self.label_saldo.config(text=f"Saldo: R$ {saldo:.2f}")
 
-
-        # Parte que printa na tela as quantidades por categoria
-        # Limpar categorias antigas
-        for widget in self.frame_categorias.winfo_children():
+        for widget in self.right_frame.winfo_children():
+            widget.destroy()
+        for widget in self.progress_bars_frame.winfo_children():
             widget.destroy()
 
-        # Caso não haja categorias
-        if not resultados_categoria:
-            tk.Label(self.frame_categorias, text="Nenhuma categoria encontrada.",
-                    bg="#2E2E2E", fg="white").pack()
-            return
+        labels_grafico = []
+        valores_grafico = []
+        cores_grafico = []
 
-        # Criar título
-        tk.Label(self.frame_categorias, text="Transações por categoria:",
-                bg="#2E2E2E", fg="white", font=("Arial", 10, "bold")).pack()
+        if receita > 0:
+            sobra = receita - despesa - investimento
 
-        # Exibir cada categoria
-        for item in resultados_categoria:
-            categoria = item["name"]
-            total = item["total"]
+            if despesa > 0:
+                labels_grafico.append("Despesas")
+                valores_grafico.append(despesa)
+                cores_grafico.append("#F44336")
 
-            tk.Label(
-                self.frame_categorias,
-                text=f"{categoria}: {total}",
-                bg="#2E2E2E",
-                fg="white",
-                anchor="w"
-            ).pack(fill="x")
+            if investimento > 0:
+                labels_grafico.append("Investimentos")
+                valores_grafico.append(investimento)
+                cores_grafico.append("#2196F3") 
 
+            if sobra > 0:
+                labels_grafico.append("Sobra")
+                valores_grafico.append(sobra)
+                cores_grafico.append("#4CAF50")
 
+            style = ttk.Style()
+            bg_color = style.lookup("TFrame", "background")
+            fig = Figure(figsize=(4, 3.5), dpi=100, facecolor=bg_color)
+            ax = fig.add_subplot(111)
 
+            wedges, texts, autotexts = ax.pie(
+                valores_grafico,
+                autopct="%1.1f%%",
+                startangle=140,
+                colors=cores_grafico,
+                textprops=dict(color="w"),
+            )
 
-        
+            for autotext in autotexts:
+                autotext.set_color("black")
+
+            ax.legend(
+                wedges,
+                labels_grafico,
+                title="Fluxo Financeiro",
+                title_fontsize="small",
+                loc="lower center",
+                bbox_to_anchor=(0.5, -0.3),
+                ncol=len(labels_grafico),
+                prop={"size": 8},
+            )
+            ax.axis("equal")
+            fig.suptitle(
+                f"Distribuição da Receita (R$ {receita:.2f})",
+                color="white",
+                fontsize=12,
+            )
+            fig.tight_layout(pad=2.0)
+
+            # Cria o canvas do Tkinter para exibir o gráfico
+            canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="both", expand=True)
+        else:
+            ttk.Label(
+                self.right_frame,
+                text="Nenhum dado financeiro para exibir no gráfico.",
+                font=("Arial", 12),
+            ).pack(expand=True)
+
+        frame_gastos_categoria = ttk.Frame(self.progress_bars_frame)
+        frame_gastos_categoria.pack(pady=(0, 20), fill="x")
+
+        ttk.Label(
+            frame_gastos_categoria,
+            text="Gastos por Categoria (em relação à Receita)",
+            font=("Arial", 12, "bold"),
+        ).pack()
+
+        if gastos_por_categoria and receita > 0:
+            for categoria, gasto_total in sorted(
+                gastos_por_categoria, key=lambda item: item[1], reverse=True
+            ):
+                percentual = (gasto_total / receita) * 100
+
+                frame_linha = ttk.Frame(frame_gastos_categoria)
+                frame_linha.pack(fill="x", pady=2)
+
+                label_texto = f"{categoria}: R$ {gasto_total:.2f} ({percentual:.1f}%)"
+                ttk.Label(frame_linha, text=label_texto, anchor="w").pack(
+                    side="top", fill="x"
+                )
+
+                progress = ttk.Progressbar(
+                    frame_linha,
+                    orient="horizontal",
+                    mode="determinate",
+                    bootstyle="danger",
+                )
+                progress["value"] = percentual
+                progress.pack(side="bottom", fill="x")
+        else:
+            ttk.Label(
+                frame_gastos_categoria,
+                text="Sem despesas para analisar.",
+            ).pack()
+
+        ttk.Label(
+            frame_gastos_categoria,
+            text="Investimentos (em relação à Receita)",
+            font=("Arial", 12, "bold"),
+        ).pack(pady=(20, 0))
+
+        if investimentos_por_categoria and receita > 0:
+            for categoria, investimento_total in sorted(
+                investimentos_por_categoria, key=lambda item: item[1], reverse=True
+            ):
+                percentual = (investimento_total / receita) * 100
+
+                frame_linha = ttk.Frame(frame_gastos_categoria)
+                frame_linha.pack(fill="x", pady=2)
+
+                label_texto = (
+                    f"{categoria}: R$ {investimento_total:.2f} ({percentual:.1f}%)"
+                )
+                ttk.Label(frame_linha, text=label_texto, anchor="w").pack(
+                    side="top", fill="x"
+                )
+
+                progress = ttk.Progressbar(
+                    frame_linha,
+                    orient="horizontal",
+                    mode="determinate",
+                    bootstyle="info",
+                )
+                progress["value"] = percentual
+                progress.pack(side="bottom", fill="x")
+        else:
+            ttk.Label(
+                frame_gastos_categoria,
+                text="Sem investimentos para analisar.",
+            ).pack()
