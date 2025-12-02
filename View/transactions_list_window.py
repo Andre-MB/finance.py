@@ -7,6 +7,7 @@ class TransactionsListWindow(ttk.Toplevel):
     def __init__(self, parent, controller, dados, callback_on_close):
         super().__init__(parent)
         self.controller = controller
+        self.main_window = parent  # Salva a referência da janela principal
         self.callback_on_close = callback_on_close
 
         self.title("Transações e Análise de Gastos")
@@ -119,7 +120,7 @@ class TransactionsListWindow(ttk.Toplevel):
             return
         id_transacao = selecionado[0]
         # Chama o método da MainWindow para abrir a janela de edição
-        self.master.abrir_janela_editar(id_transacao)
+        self.main_window.abrir_janela_editar(id_transacao)
         self.on_close()
 
     def on_close(self):
